@@ -1,0 +1,284 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+    <meta charset="UTF-8" />
+    <title>Making your first Phaser 3 Game - Part 1</title>
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<script type="text/javascript">
+
+    var config = {
+        type: Phaser.AUTO,
+        width: 800,
+        height: 600,
+        physics: {
+            default: 'arcade',
+            arcade: {
+                gravity: { y: 300 },
+                debug: false
+            }
+        },
+        scene: {
+            preload: preload,
+            create: create,
+            update: update
+        }
+    };
+
+    var game = new Phaser.Game(config);
+    var score = 0;
+    var scoreText;
+    stepLimit = 400;
+    health = 300;
+
+    function preload ()
+    {
+        this.load.image('sky', 'assets/sky.png');
+        this.load.image('ground', 'assets/platform.png');
+        this.load.image('star', 'assets/star.png');
+        this.load.image('bomb', 'assets/bomb.png');
+        this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
+        this.load.spritesheet('mummy', 'assets/mummy37x45.png', { frameWidth: 37, frameHeight: 45});
+        this.load.image('healthBar', 'assets/vu.png');
+        this.load.audio('ping', ['assets/audio/p-ping.mp3']);
+        this.load.audio('step1', ['assets/audio/steps1.mp3', 'assets/audio/steps2.mp3']);
+        this.load.audio('bloodSplash', ['assets/audio/mixkit-video-game-blood-pop-2361.wav'])
+
+    }
+
+    var platforms;
+    
+    function create ()
+    {   
+        sprinting = false;
+        downFlag = false;
+        ping = this.sound.add('ping');
+        step1 = this.sound.add('step1');
+        playerHit = this.sound.add('bloodSplash')
+        this.add.image(400, 300, 'sky');
+
+        platforms = this.physics.add.staticGroup();
+
+        platforms.create(400, 568 ,'ground').setScale(2).refreshBody();
+
+        platforms.create(600, 400, 'ground');
+        platforms.create(50, 250, 'ground');
+        platforms.create(750, 220, 'ground');
+
+        var healthBarBorder = this.add.rectangle(400, 575, 302, 25);
+        healthBarBorder.setStrokeStyle(4, 0xffffff);
+        healthBar = this.add.image(400, 580, 'healthBar')
+        healthBar.setCrop(0, 0, health, 20)
+        
+
+        player = this.physics.add.sprite(100, 450, 'dude');
+        // // TODO Walking sound
+        // player.on('animationupdate', function() {
+        //     if( player.anims.currentAnim.key === 'left' || player.anims.currentAnim.key === 'right' ) {
+        //         step1.play();
+        //         console.log('walking')
+        //     }
+        // })
+
+        player.setBounce(0);
+        player.setCollideWorldBounds(true);
+        // player.body.setGravity(-500);
+
+        this.physics.add.collider(player, platforms);
+
+        mummy = this.physics.add.sprite(400, 450, 'mummy');
+
+        this.anims.create({
+            key: 'walk',
+            frames: this.anims.generateFrameNumbers('mummy'),
+            frameRate: 16,
+            repeat: -1
+        });
+        
+        mummy.anims.play('walk', true);
+        
+        mummy.setBounce(0.2);
+        mummy.setCollideWorldBounds(true);
+        mummy.body.velocity.x = 40;
+        mummy.stepCount = 0;
+        
+
+
+        this.physics.add.collider(mummy, platforms);
+
+        this.physics.add.overlap(player, mummy, hitMummy, null, this);
+
+        function hitMummy (player, mummy)
+        {
+            player.body.position.x = (player.body.position.x < mummy.body.position.x) ? player.body.position.x -20 : player.body.position.x + 20;
+            health -= 100;
+            player.setTint(0xff0000);
+            player.anims.play('turn');
+            playerHit.play();
+            healthBar.setCrop(0, 0, health, 20);
+            this.tweens.add({
+                delay: 500,
+                targets: player,
+                callback: ()=> {
+                    player.clearTint()
+                }
+            });
+        }
+
+        // Define keys
+        cursors = this.input.keyboard.createCursorKeys();
+        key_W = this.input.keyboard.addKey('W');
+        key_A = this.input.keyboard.addKey('A');
+        key_S = this.input.keyboard.addKey('S');
+        key_D = this.input.keyboard.addKey('D');
+
+        stars = this.physics.add.group({
+            key: 'star',
+            repeat: 11,
+            setXY: { x: 12, y: 0, stepX: 70 }
+        });
+
+        stars.children.iterate(function (child) {
+            child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
+        });
+
+        this.physics.add.collider(stars, platforms);
+        
+        this.physics.add.overlap(player, stars, collectStar, null, this);
+
+        function collectStar (player, star)
+        {
+            star.disableBody(true, true);
+            ping.play();
+
+            score += 10;
+            scoreText.setText('Score: ' + score);
+
+            if (stars.countActive(true) === 0)      // if all the stars have been collected
+            {
+                stars.children.iterate(function (child) {
+                    child.enableBody(true, child.x, 0, true, true);
+                });
+            
+            var spawnPos = (player.x < 400) ? Phaser.Math.Between(400, 800) : Phaser.Math.Between(0, 400);
+
+            var bomb = bombs.create(spawnPos, 16, 'bomb');
+            bomb.setBounce(1);
+            bomb.setCollideWorldBounds(true);
+            bomb.setVelocity(Phaser.Math.Between(-200, 200), 20)
+            }
+        }
+
+        scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#000'});
+
+        bombs = this.physics.add.group();
+
+        this.physics.add.collider(bombs, platforms);
+
+        this.physics.add.collider(player, bombs, hitBomb, null, this);
+
+        function hitBomb (player, bomb)
+        {
+            this.physics.pause();
+            player.setTint(0xff0000);
+            player.anims.play('turn');
+
+            gameOver = true;
+        }
+
+
+        this.anims.create({
+            key: 'left',
+            frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }),
+            frameRate: 10,
+            repeat: -1,
+            callback : console.log(player.anims.currentAnim)
+        });
+        
+        this.anims.create({
+            key: 'turn',
+            frames: [ { key: 'dude', frame : 4 } ],
+            frameRate: 20
+        });
+
+        this.anims.create({
+            key: 'right',
+            frames : this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }),
+            frameRate: 10,
+            repeat: -1
+        });
+
+    }
+
+    function update ()
+    {
+        mummy.stepCount++;
+        if (mummy.stepCount > stepLimit) {
+            mummy.body.velocity.x *= -1;
+            mummy.flipX= (mummy.body.velocity.x < 0) ? true : false;        // if mummy is going left flip the sprite
+            mummy.stepCount = 0;
+        }
+
+        if (health <= 0) {
+            this.physics.pause();
+
+            gameOver = true;
+        }
+
+        if (key_A.isDown) {
+            player.setVelocityX(-160);
+            player.anims.play('left', true);
+        }
+        else if (key_D.isDown) {
+            player.setVelocityX(160);
+            player.anims.play('right', true);
+            console.log(player.body.velocity.x)
+        }
+        else {
+            player.setVelocityX(0);
+            player.anims.play('turn', true);
+        }
+        if (cursors.space.isDown && player.body.touching.down) {
+            player.setVelocityY(-330);
+        }
+        if (cursors.shift.isDown && player.body.touching.down) {
+            sprinting = true;
+            player.body.velocity.x *= 2;
+            console.log(sprinting);
+        }
+        else {
+            if(sprinting && !player.body.touching.down) {
+                player.body.velocity.x *= 2;
+                console.log(sprinting);
+            }
+            else {
+                sprinting = false;
+            }
+        }
+        if (key_S.isDown) {
+            downFlag = true;
+            player.setScale(0.6);
+            console.log('crouching');
+        }
+        else {
+            if(downFlag && player.body.touching.down) {
+                downFlag = false;
+                player.setScale(1);
+                // player.body.velocity.y -= 70;
+                // player.setVelocityY(-70);
+                player.y -= 8;
+            }
+        }
+    }
+
+</script>
+
+</body>
+</html>
