@@ -1,4 +1,5 @@
 # phaser-game
+![Alt text](screenshots/gameplay-screenshot.png?raw=true "Title")
 A side-scrolling 2D videogame made with HTMl and JavaScript with the use of Phaser 3 framework.
 
 ## Goal of the game
